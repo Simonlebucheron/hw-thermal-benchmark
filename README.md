@@ -47,13 +47,13 @@ Interactive plot:
 ```
 gnuplot -p \
 -e "file='data/stock_stress.csv'" \
-plots/temperature.gnuplot
+gnuplot/temperature.gnuplot
 ```
 Generate PNG:
 ```
 gnuplot \
 -e "file='data/stock_stress.csv';out='results/stock_stress_temperature.png'" \
-plots/temperature.gnuplot
+gnuplot/temperature.gnuplot
 ```
 
 ---
@@ -70,7 +70,7 @@ Generate PNG:
 ```
 gnuplot \
 -e "file='data/stock_stress.csv';out='results/stock_stress_fan.png'" \
-plots/fan.gnuplot
+gnuplot/fan.gnuplot
 ```
 
 ---
