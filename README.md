@@ -1,12 +1,8 @@
 # Hardware Thermal Benchmark Logger
 
-Linux-only tools for simple thermal comparisons between hardware states.
+Linux-only tools for thermal comparisons between hardware states.
 
-The workflow is intentionally small:
-
-- `logger_rpm.sh` captures sensors to CSV
-- `scripts/benchmark.sh` starts capture and launches the workload
-- `scripts/run_openbenchmark.sh` runs standard Phoronix Test Suite benchmarks
+`logger_rpm.sh` captures sensors to CSV, `scripts/benchmark.sh` starts capture and launches the workload, and `scripts/run_openbenchmark.sh` runs standard Phoronix Test Suite benchmarks.
 
 ## Requirements
 
@@ -22,19 +18,19 @@ sensors
 
 ## Quick Start
 
-Pick a label that describes the hardware state:
+Pick a label, then choose the flow you want:
 
 ```bash
 ./scripts/benchmark.sh commands cpu_hwstate1
 ```
 
-Fastest path (single terminal, fully automated trigger windows):
+Single terminal:
 
 ```bash
 ./scripts/benchmark.sh run cpu_hwstate1 cpu
 ```
 
-Two-terminal mode (manual workload start):
+Two terminals:
 
 ```bash
 ./scripts/benchmark.sh start cpu_hwstate1
@@ -44,24 +40,29 @@ Two-terminal mode (manual workload start):
 ./scripts/benchmark.sh load cpu
 ```
 
-At the start of capture, the script asks for an ambient temperature in `degC`. Press Enter to skip and continue.
-A small `.meta` file is written next to the CSV with the label, timestamp, and ambient temperature if provided.
-It is a generated sidecar, ignored by git, and not consumed by the plotting or benchmark scripts.
-GPU power capture is enabled by default through `benchmark.config.json` and is plotted on a secondary axis.
-CPU package power is sampled from Linux powercap/RAPL when available and plotted on a secondary axis too.
-`platform_power_w` is a practical combined trace (`cpu_power_w + gpu_power_w` when both are available).
+At capture start, the script asks for ambient temperature in `degC`; press Enter to skip. The `.meta` sidecar next to each CSV is generated only for run context.
 
-Recommended split:
+Use `benchmark.config.json` for persistent defaults, `benchmark.config.example.json` as the model, `BENCH_CONFIG=/path/to/local.json` for local overrides, and environment variables such as `AMBIENT_TEMP_C` for temporary values.
 
-- Keep `benchmark.config.json` for persistent project defaults.
-- Keep `.meta` as run-sidecar context only.
-- Use environment variables for temporary overrides (`BENCH_CONFIG`, `AMBIENT_TEMP_C`, etc.).
+## Command Reference
+
+| Command | Args | What it does |
+| --- | --- | --- |
+| `commands` | `<label>` | Prints the exact capture and workload commands for the label and current default category. |
+| `start` | `<label>` | Starts capture only. Use this in one terminal, then launch the workload in another. |
+| `load` | `cpu`, `gpu`, `system` | Runs the OpenBenchmark workload only. If the category is omitted, the config default is used. |
+| `run` | `<label>`[`cpu`,`gpu`,`system`] | Starts capture, waits for the pre-trigger window, runs the workload, then keeps capturing through the post-trigger window. |
+| `doctor` | none | Shows the active config file, detected sensor chips, and effective defaults. |
+
+If `openbenchmark.tests` is empty, category defaults are used. If you override the category on `load` or `run`, tests from the matching category are ignored unless `OPENBENCHMARK_TESTS_CSV` is set explicitly.
 
 ## Configuration
 
-Default config file: [benchmark.config.json](benchmark.config.json)
+Official config file: [benchmark.config.json](benchmark.config.json)
 
-Summary:
+Model file: [benchmark.config.example.json](benchmark.config.example.json)
+
+All settings:
 
 | Key | Type | Values | Default | Purpose |
 | --- | --- | --- | --- | --- |
@@ -79,53 +80,33 @@ Summary:
 | `openbenchmark.runs` | integer | Positive number | `3` | Number of benchmark repetitions. |
 | `openbenchmark.tests` | array of strings | Empty or a list of test names | built-in defaults | Explicit test list for the default category; `pts/` prefixes are optional. |
 
-If `openbenchmark.tests` is empty, the script uses category defaults:
+To use a local config without editing the tracked file, point `BENCH_CONFIG` to your own JSON file:
 
-- cpu: `build-linux-kernel`, `compress-zstd`
-- gpu: `glmark2`, `unigine-heaven`
-- system: `build-linux-kernel`, `openssl`
+```bash
+BENCH_CONFIG=$HOME/.config/hw-thermal-benchmark/config.json ./scripts/benchmark.sh run cpu_hwstate1 cpu
+```
 
-Important: if you run `./scripts/benchmark.sh load gpu` (or `run ... gpu`) while `openbenchmark.category` is `cpu`, the script now ignores configured CPU test overrides and uses GPU defaults unless `OPENBENCHMARK_TESTS_CSV` is explicitly set.
+## Plots
 
-## Outputs
-
-CSV files are written to `data/` by default.
-
-Plot the CSV without specifying an output name and the script will create a file linked to the input name:
+CSV files are written to `data/` by default. Plotting a CSV without `out=` names the result from the input file:
 
 ```bash
 gnuplot -e "file='data/cpu_hwstate1_20260723_195045.csv'" gnuplot/temperature.gnuplot
 gnuplot -e "file='data/cpu_hwstate1_20260723_195045.csv'" gnuplot/fan.gnuplot
 ```
 
-That produces files such as:
+Example outputs:
 
 - `results/cpu_hwstate1_20260723_195045_temperature.png`
 - `results/cpu_hwstate1_20260723_195045_fan.png`
 
-The GPU, CPU, and platform power traces are drawn on the secondary axis in both plots.
+The GPU, CPU, and platform power traces are drawn on the secondary axis. Use `sensor_display_mode=off` for clean OpenBenchmark logs in `run` mode, or `tmux` if you want a live telemetry pane. Pass `out=` explicitly for a custom destination.
 
-For clean OpenBenchmark logs in `run` mode, use `sensor_display_mode=off` (or `tmux` if you want a dedicated live telemetry pane).
+## Method
 
-If you want a custom destination, pass `out=` explicitly.
-
-## Notes
-
-- Use labels that describe the hardware state, such as `cpu_hwstate1` or `gpu_hwstate2`.
-- Keep BIOS fan curves identical between runs.
-- Keep ambient room temperature as close as possible.
-- Keep case panel state identical.
-- Keep workload category or explicit test list identical.
-- Keep benchmark run count identical.
-- Keep sampling interval identical.
-
-## Benchmark Method
-
-1. Idle baseline: run `./scripts/benchmark.sh run idle_hwstate1 system` without foreground workload changes.
-2. CPU scenario: run `./scripts/benchmark.sh run cpu_hwstate1 cpu`.
-3. GPU scenario: run `./scripts/benchmark.sh run gpu_hwstate1 gpu`.
-4. Repeat each scenario with the same ambient and BIOS settings.
-5. Generate plots from matching labels and compare peak, plateau, and cool-down slopes.
+1. Capture an idle baseline with `./scripts/benchmark.sh run idle_hwstate1 system`.
+2. Capture CPU and GPU scenarios with the same ambient conditions, BIOS fan curves, workload category, run count, and sampling interval.
+3. Plot matching labels and compare peak, plateau, and cool-down behavior.
 
 ## Validation
 

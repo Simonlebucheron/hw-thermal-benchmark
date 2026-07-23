@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Run the configured OpenBenchmark workload for a thermal capture.
+
 set -u -o pipefail
 
 CATEGORY="${1:-cpu}"

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Orchestrate capture, workload execution, and benchmark presets.
+
 set -u -o pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -112,11 +114,11 @@ prompt_ambient_temperature() {
 usage() {
     cat <<'EOF'
 Usage:
-  ./scripts/benchmark.sh commands <label>
-  ./scripts/benchmark.sh start <label>
+    ./scripts/benchmark.sh commands <label>
+    ./scripts/benchmark.sh start <label>
     ./scripts/benchmark.sh load [cpu|gpu|system]
     ./scripts/benchmark.sh run <label> [cpu|gpu|system]
-  ./scripts/benchmark.sh doctor
+    ./scripts/benchmark.sh doctor
 
 Examples:
     ./scripts/benchmark.sh commands cpu_hwstate1

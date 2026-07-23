@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Capture lm-sensors data to CSV for thermal benchmark runs.
+
 set -u -o pipefail
 
 INTERVAL="${INTERVAL:-1}"
