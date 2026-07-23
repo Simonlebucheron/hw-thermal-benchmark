@@ -3,7 +3,7 @@
 
 
 if (!exists("file")) file="benchmark.csv"
-if (!exists("out")) out="temperature.png"
+if (!exists("out")) out=sprintf("results/%s_temperature.png", system(sprintf("basename %s .csv", file)))
 
 
 set datafile separator ","

@@ -92,6 +92,20 @@ sanitize_label() {
     printf '%s\n' "$label"
 }
 
+prompt_ambient_temperature() {
+    local ambient_temp="${AMBIENT_TEMP_C:-}"
+
+    if [[ -z "$ambient_temp" && -t 0 ]]; then
+        printf 'Ambient temperature in degC [Enter to skip]: ' >&2
+        if ! read -r -t 15 ambient_temp; then
+            ambient_temp=""
+            printf '\n' >&2
+        fi
+    fi
+
+    printf '%s\n' "$ambient_temp"
+}
+
 usage() {
     cat <<'EOF'
 Usage:
@@ -128,11 +142,12 @@ start_capture() {
     local label
     label="$(sanitize_label "$raw_label")"
 
-    local output_dir interval timestamp out_file mb_chip gpu_chip
+    local output_dir interval timestamp out_file meta_file mb_chip gpu_chip ambient_temp
     output_dir="$(read_cfg "output_dir" "data")"
     interval="$(read_cfg "interval_s" "1")"
     mb_chip="$(read_cfg "mb_chip_pattern" "auto")"
     gpu_chip="$(read_cfg "gpu_chip_pattern" "auto")"
+    ambient_temp="$(prompt_ambient_temperature)"
 
     if [[ "$mb_chip" == "auto" ]]; then
         mb_chip="$(detect_mb_chip)"
@@ -150,12 +165,25 @@ start_capture() {
     timestamp="$(date '+%Y%m%d_%H%M%S')"
     mkdir -p "$ROOT_DIR/$output_dir"
     out_file="$ROOT_DIR/$output_dir/${label}_${timestamp}.csv"
+    meta_file="${out_file%.csv}.meta"
+
+    {
+        printf 'label=%s\n' "$label"
+        printf 'timestamp=%s\n' "$timestamp"
+        printf 'ambient_temp_c=%s\n' "${ambient_temp:-}"
+    } > "$meta_file"
 
     echo "Starting capture"
     echo "  file: $out_file"
+    if [[ -n "$ambient_temp" ]]; then
+        echo "  ambient_temp_c: $ambient_temp"
+    else
+        echo "  ambient_temp_c: skipped"
+    fi
     echo "  interval_s: $interval"
     echo "  mb_chip_pattern: $mb_chip"
     echo "  gpu_chip_pattern: $gpu_chip"
+    echo "  meta_file: $meta_file"
 
     INTERVAL="$interval" \
     MB_CHIP_PATTERN="$mb_chip" \
