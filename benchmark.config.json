@@ -10,8 +10,21 @@
   "live_preview": true,
   "sensor_display_mode": "off",
   "openbenchmark": {
-    "category": "cpu",
+    "default_category": "cpu",
     "runs": 1,
-    "tests": []
+    "tests": {
+      "cpu": [
+        "build-linux-kernel",
+        "compress-zstd"
+      ],
+      "gpu": [
+        "3dmark",
+        "unigine-heaven"
+      ],
+      "system": [
+        "blender",
+        "openssl"
+      ]
+    }
   }
 }

@@ -61,6 +61,70 @@ else:
 PY
 }
 
+read_openbenchmark_default_category() {
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        printf '%s\n' "cpu"
+        return 0
+    fi
+
+    python3 - "$CONFIG_FILE" <<'PY'
+import json
+
+config_path = __import__("sys").argv[1]
+try:
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    print("cpu")
+    raise SystemExit(0)
+
+openbenchmark = data.get("openbenchmark", {})
+value = openbenchmark.get("default_category")
+if value is None:
+    value = openbenchmark.get("category", "cpu")
+
+print(value if value else "cpu")
+PY
+}
+
+read_openbenchmark_tests_csv() {
+    local category="$1"
+    local default_value="$2"
+
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        printf '%s\n' "$default_value"
+        return 0
+    fi
+
+    python3 - "$CONFIG_FILE" "$category" "$default_value" <<'PY'
+import json
+import sys
+
+config_path, category, default = sys.argv[1:]
+try:
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    print(default)
+    raise SystemExit(0)
+
+tests = data.get("openbenchmark", {}).get("tests", None)
+
+if isinstance(tests, dict):
+    value = tests.get(category)
+    if value is None and category != "default":
+        value = tests.get("default")
+    if isinstance(value, list):
+        print(",".join(str(item) for item in value))
+    else:
+        print(default)
+elif isinstance(tests, list):
+    print(",".join(str(item) for item in tests))
+else:
+    print(default)
+PY
+}
+
 detect_mb_chip() {
     sensors | awk '
         /^[[:alnum:]_.-]+-[[:alnum:]_.-]+-[[:xdigit:]]+$/ {
@@ -135,7 +199,7 @@ print_commands() {
     label="$(sanitize_label "$raw_label")"
 
     local category
-    category="$(read_cfg "openbenchmark.category" "cpu")"
+    category="$(read_openbenchmark_default_category)"
 
     echo "Terminal A (capture):"
     echo "./scripts/benchmark.sh start $label"
@@ -328,23 +392,18 @@ start_capture() {
 
 run_openbenchmark() {
     local category="${1:-}"
-    local cfg_category cfg_runs cfg_tests tests_csv
-    cfg_category="$(read_cfg "openbenchmark.category" "cpu")"
+    local cfg_category cfg_runs tests_csv
+    cfg_category="$(read_openbenchmark_default_category)"
     cfg_runs="$(read_cfg "openbenchmark.runs" "3")"
-    cfg_tests="$(read_cfg "openbenchmark.tests" "")"
 
     if [[ -z "$category" ]]; then
         category="$cfg_category"
     fi
 
-    # If category is explicitly overridden, avoid forcing tests from config
-    # unless the caller passed OPENBENCHMARK_TESTS_CSV manually.
     if [[ -n "${OPENBENCHMARK_TESTS_CSV:-}" ]]; then
         tests_csv="${OPENBENCHMARK_TESTS_CSV:-}"
-    elif [[ -n "${1:-}" && "$category" != "$cfg_category" ]]; then
-        tests_csv=""
     else
-        tests_csv="$cfg_tests"
+        tests_csv="$(read_openbenchmark_tests_csv "$category" "")"
     fi
 
     FORCE_TIMES_TO_RUN="$cfg_runs" OPENBENCHMARK_TESTS_CSV="$tests_csv" "$ROOT_DIR/scripts/run_openbenchmark.sh" "$category"
@@ -444,6 +503,10 @@ run_capture_and_load() {
 }
 
 doctor() {
+    local default_category
+
+    default_category="$(read_openbenchmark_default_category)"
+
     echo "Config file: $CONFIG_FILE"
     if [[ -f "$CONFIG_FILE" ]]; then
         echo "status: found"
@@ -463,9 +526,9 @@ doctor() {
     echo "  trigger_post_s: $(read_cfg "trigger_post_s" "60")"
     echo "  live_preview: $(read_cfg "live_preview" "true")"
     echo "  sensor_display_mode: $(read_cfg "sensor_display_mode" "off")"
-    echo "  openbenchmark.category: $(read_cfg "openbenchmark.category" "cpu")"
+    echo "  openbenchmark.default_category: $default_category"
     echo "  openbenchmark.runs: $(read_cfg "openbenchmark.runs" "3")"
-    echo "  openbenchmark.tests: $(read_cfg "openbenchmark.tests" "")"
+    echo "  openbenchmark.tests[$default_category]: $(read_openbenchmark_tests_csv "$default_category" "")"
 }
 
 main() {

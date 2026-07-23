@@ -36,34 +36,24 @@ build_test_list_from_csv() {
     printf '%s\n' "${tests[@]}"
 }
 
-default_tests_for_category() {
-    case "$CATEGORY" in
-        cpu)
-            printf '%s\n' "build-linux-kernel" "compress-zstd"
-            ;;
-        gpu)
-            printf '%s\n' "glmark2" "unigine-heaven"
-            ;;
-        system)
-            printf '%s\n' "build-linux-kernel" "openssl"
-            ;;
-        *)
-            echo "Usage: $0 {cpu|gpu|system}" >&2
-            exit 1
-            ;;
-    esac
-}
+case "$CATEGORY" in
+    cpu|gpu|system)
+        ;;
+    *)
+        echo "Usage: $0 {cpu|gpu|system}" >&2
+        exit 1
+        ;;
+esac
 
-mapfile -t TESTS < <(
-    if [[ -n "$TESTS_CSV" ]]; then
-        build_test_list_from_csv "$TESTS_CSV"
-    else
-        default_tests_for_category
-    fi
-)
+if [[ -z "$TESTS_CSV" ]]; then
+    echo "No tests resolved for category '$CATEGORY'. Set openbenchmark.tests in benchmark.config.json or pass OPENBENCHMARK_TESTS_CSV." >&2
+    exit 1
+fi
+
+mapfile -t TESTS < <(build_test_list_from_csv "$TESTS_CSV")
 
 if [[ "${#TESTS[@]}" -eq 0 ]]; then
-    echo "No tests resolved. Set openbenchmark.tests in benchmark.config.json." >&2
+    echo "No tests resolved after parsing OPENBENCHMARK_TESTS_CSV." >&2
     exit 1
 fi
 

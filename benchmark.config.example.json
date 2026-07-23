@@ -10,8 +10,23 @@
   "live_preview": true,
   "sensor_display_mode": "off",
   "openbenchmark": {
-    "category": "cpu",
+    "default_category": "cpu",
     "runs": 3,
-    "tests": []
+    "tests": {
+      "cpu": [
+        "build-linux-kernel",
+        "compress-zstd"
+      ],
+      "gpu": [
+        "3dmark",
+        "glmark2",
+        "unigine-heaven"
+      ],
+      "system": [
+        "cyberpunk2077",
+        "cs2",
+        "dota2"
+      ]
+    }
   }
 }
