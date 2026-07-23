@@ -18,7 +18,7 @@ sudo apt install lm-sensors gnuplot
 Optional workload tools:
 
 ```bash
-sudo apt install stress-ng phoronix-test-suite
+sudo apt install phoronix-test-suite
 ```
 
 Quick check:
@@ -43,16 +43,10 @@ Then run:
 ./scripts/benchmark.sh start before_stress
 ```
 
-- Terminal B (choose one load mode):
+- Terminal B (run workload):
 
 ```bash
-./scripts/benchmark.sh stress
-```
-
-or
-
-```bash
-./scripts/benchmark.sh openbenchmark cpu
+./scripts/benchmark.sh load cpu
 ```
 
 This gives exactly one command for capture and one command for load execution.
@@ -103,9 +97,9 @@ Example keys:
 - `output_dir`
 - `mb_chip_pattern`
 - `gpu_chip_pattern`
-- `stress_duration_s`
-- `openbenchmark_scenario`
-- `openbenchmark_runs`
+- `openbenchmark.category`
+- `openbenchmark.runs`
+- `openbenchmark.tests`
 
 Quick diagnostics:
 
@@ -167,31 +161,47 @@ gnuplot/fan.gnuplot
 2. Start logger.
 3. Record at least 15 minutes.
 
-### Stress-ng (simple local stress)
-
-```bash
-chmod +x scripts/run_stress_ng.sh
-./scripts/run_stress_ng.sh 900
-```
-
-### OpenBenchmark scenarios
+### OpenBenchmark categories
 
 ```bash
 chmod +x scripts/run_openbenchmark.sh
-./scripts/run_openbenchmark.sh cpu
-./scripts/run_openbenchmark.sh gpu
-./scripts/run_openbenchmark.sh mixed
+./scripts/benchmark.sh load cpu
+./scripts/benchmark.sh load gpu
+./scripts/benchmark.sh load system
 ```
 
-The script uses `phoronix-test-suite batch-run` and defaults to 3 runs per test.
-Override with `FORCE_TIMES_TO_RUN=<n>`.
+Default tests are popular PTS profiles per category:
+
+- cpu: `build-linux-kernel`, `compress-zstd`
+- gpu: `glmark2`, `unigine-heaven`
+- system: `build-linux-kernel`, `openssl`
+
+You can force explicit tests in `benchmark.config.json`:
+
+```json
+{
+  "openbenchmark": {
+    "category": "cpu",
+    "runs": 3,
+    "tests": ["build-linux-kernel"]
+  }
+}
+```
+
+When `openbenchmark.tests` is set, it overrides category defaults.
+The script runs:
+
+```bash
+phoronix-test-suite benchmark <tests...>
+```
 
 ## 8) Repeatability Rules (Before/After)
 
 - Keep BIOS fan curves identical between runs.
 - Keep ambient room temperature as close as possible.
 - Keep case panel state identical (open/closed).
-- Keep workload and duration identical.
+- Keep workload category or explicit test list identical.
+- Keep benchmark run count identical.
 - Keep sampling interval identical.
 - Record notes for any deviation.
 
@@ -202,9 +212,9 @@ Use [BENCHMARK_CHECKLIST.md](BENCHMARK_CHECKLIST.md) during execution.
 Run quick checks before collecting final comparison data:
 
 ```bash
-bash -n logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh
+bash -n logger_rpm.sh logger_pwm.sh scripts/run_openbenchmark.sh
 bash -n scripts/benchmark.sh
-shellcheck logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh scripts/benchmark.sh
+shellcheck logger_rpm.sh logger_pwm.sh scripts/run_openbenchmark.sh scripts/benchmark.sh
 gnuplot -e "file='data/stock_stress.csv';out='results/smoke_temp.png'" gnuplot/temperature.gnuplot
 gnuplot -e "file='data/stock_stress.csv';out='results/smoke_fan.png'" gnuplot/fan.gnuplot
 ```

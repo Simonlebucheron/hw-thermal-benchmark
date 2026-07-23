@@ -37,11 +37,20 @@ except Exception:
     print(default)
     raise SystemExit(0)
 
-value = data.get(key, default)
+value = data
+for part in key.split('.'):
+    if isinstance(value, dict) and part in value:
+        value = value[part]
+    else:
+        value = default
+        break
+
 if value is None:
     print(default)
 elif isinstance(value, bool):
     print("true" if value else "false")
+elif isinstance(value, list):
+    print(",".join(str(item) for item in value))
 else:
     print(value)
 PY
@@ -88,15 +97,14 @@ usage() {
 Usage:
   ./scripts/benchmark.sh commands <label>
   ./scripts/benchmark.sh start <label>
-  ./scripts/benchmark.sh stress [duration_seconds]
-  ./scripts/benchmark.sh openbenchmark [cpu|gpu|mixed]
+    ./scripts/benchmark.sh load [cpu|gpu|system]
   ./scripts/benchmark.sh doctor
 
 Examples:
   ./scripts/benchmark.sh commands before_cpu
   ./scripts/benchmark.sh start before_cpu
-  ./scripts/benchmark.sh stress
-  ./scripts/benchmark.sh openbenchmark mixed
+    ./scripts/benchmark.sh load
+    ./scripts/benchmark.sh load cpu
 EOF
 }
 
@@ -105,17 +113,14 @@ print_commands() {
     local label
     label="$(sanitize_label "$raw_label")"
 
-    local scenario
-    scenario="$(read_cfg "openbenchmark_scenario" "cpu")"
+    local category
+    category="$(read_cfg "openbenchmark.category" "cpu")"
 
     echo "Terminal A (capture):"
     echo "./scripts/benchmark.sh start $label"
     echo
-    echo "Terminal B (local stress-ng):"
-    echo "./scripts/benchmark.sh stress"
-    echo
-    echo "Terminal B (OpenBenchmark):"
-    echo "./scripts/benchmark.sh openbenchmark $scenario"
+    echo "Terminal B (workload - OpenBenchmark):"
+    echo "./scripts/benchmark.sh load $category"
 }
 
 start_capture() {
@@ -158,31 +163,22 @@ start_capture() {
     exec "$ROOT_DIR/logger_rpm.sh" "$out_file"
 }
 
-run_stress() {
-    local duration="${1:-}"
-    local cfg_duration cfg_cpu cfg_gpu
-    cfg_duration="$(read_cfg "stress_duration_s" "900")"
-    cfg_cpu="$(read_cfg "stress_cpu_workers" "0")"
-    cfg_gpu="$(read_cfg "stress_gpu_workers" "1")"
+run_openbenchmark() {
+    local category="${1:-}"
+    local cfg_category cfg_runs cfg_tests
+    cfg_category="$(read_cfg "openbenchmark.category" "cpu")"
+    cfg_runs="$(read_cfg "openbenchmark.runs" "3")"
+    cfg_tests="$(read_cfg "openbenchmark.tests" "")"
 
-    if [[ -z "$duration" ]]; then
-        duration="$cfg_duration"
+    if [[ -z "$category" ]]; then
+        category="$cfg_category"
     fi
 
-    CPU_WORKERS="$cfg_cpu" GPU_WORKERS="$cfg_gpu" exec "$ROOT_DIR/scripts/run_stress_ng.sh" "$duration"
+    FORCE_TIMES_TO_RUN="$cfg_runs" OPENBENCHMARK_TESTS_CSV="$cfg_tests" exec "$ROOT_DIR/scripts/run_openbenchmark.sh" "$category"
 }
 
-run_openbenchmark() {
-    local scenario="${1:-}"
-    local cfg_scenario cfg_runs
-    cfg_scenario="$(read_cfg "openbenchmark_scenario" "cpu")"
-    cfg_runs="$(read_cfg "openbenchmark_runs" "3")"
-
-    if [[ -z "$scenario" ]]; then
-        scenario="$cfg_scenario"
-    fi
-
-    FORCE_TIMES_TO_RUN="$cfg_runs" exec "$ROOT_DIR/scripts/run_openbenchmark.sh" "$scenario"
+run_load() {
+    run_openbenchmark "${1:-}"
 }
 
 doctor() {
@@ -200,9 +196,9 @@ doctor() {
     echo "Effective defaults:"
     echo "  interval_s: $(read_cfg "interval_s" "1")"
     echo "  output_dir: $(read_cfg "output_dir" "data")"
-    echo "  stress_duration_s: $(read_cfg "stress_duration_s" "900")"
-    echo "  openbenchmark_scenario: $(read_cfg "openbenchmark_scenario" "cpu")"
-    echo "  openbenchmark_runs: $(read_cfg "openbenchmark_runs" "3")"
+    echo "  openbenchmark.category: $(read_cfg "openbenchmark.category" "cpu")"
+    echo "  openbenchmark.runs: $(read_cfg "openbenchmark.runs" "3")"
+    echo "  openbenchmark.tests: $(read_cfg "openbenchmark.tests" "")"
 }
 
 main() {
@@ -224,11 +220,8 @@ main() {
             fi
             start_capture "$2"
             ;;
-        stress)
-            run_stress "${2:-}"
-            ;;
-        openbenchmark)
-            run_openbenchmark "${2:-}"
+        load)
+            run_load "${2:-}"
             ;;
         doctor)
             doctor

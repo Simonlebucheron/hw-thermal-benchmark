@@ -24,8 +24,7 @@ Use this list for both BEFORE and AFTER runs.
 
 ## Load Scenario
 
-- [ ] Same load tool and scenario used (stress-ng or OpenBenchmark)
-- [ ] Same duration
+- [ ] Same OpenBenchmark category or explicit tests used (cpu, gpu, or system)
 - [ ] Same run count for benchmark tool
 - [ ] Logger started before workload launch
 
