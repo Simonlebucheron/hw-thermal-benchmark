@@ -5,6 +5,8 @@ Small Linux thermal benchmark tools for repeatable before/after hardware compari
 The core logger is `logger_rpm.sh`.
 `logger_pwm.sh` is kept as a compatibility entrypoint and forwards to `logger_rpm.sh`.
 
+For ergonomic execution, use `scripts/benchmark.sh` as the single control entrypoint.
+
 ## 1) Requirements
 
 Mandatory:
@@ -25,7 +27,37 @@ Quick check:
 sensors
 ```
 
-## 2) Record Data
+## 2) Fast Ergonomic Workflow (2 terminals)
+
+Print ready-to-run commands for a session label:
+
+```bash
+./scripts/benchmark.sh commands before_stress
+```
+
+Then run:
+
+- Terminal A (capture):
+
+```bash
+./scripts/benchmark.sh start before_stress
+```
+
+- Terminal B (choose one load mode):
+
+```bash
+./scripts/benchmark.sh stress
+```
+
+or
+
+```bash
+./scripts/benchmark.sh openbenchmark cpu
+```
+
+This gives exactly one command for capture and one command for load execution.
+
+## 3) Record Data (manual mode)
 
 Create output folder:
 
@@ -57,7 +89,33 @@ GPU_CHIP_PATTERN='amdgpu-pci-0300' \
 ./logger_rpm.sh data/custom.csv
 ```
 
-## 3) CSV Format
+## 4) JSON Configuration
+
+Default config file:
+
+```text
+benchmark.config.json
+```
+
+Example keys:
+
+- `interval_s`
+- `output_dir`
+- `mb_chip_pattern`
+- `gpu_chip_pattern`
+- `stress_duration_s`
+- `openbenchmark_scenario`
+- `openbenchmark_runs`
+
+Quick diagnostics:
+
+```bash
+./scripts/benchmark.sh doctor
+```
+
+The `start` command auto-detects motherboard and GPU chip patterns from `sensors` when set to `auto`.
+
+## 5) CSV Format
 
 Header (stable order):
 
@@ -67,7 +125,7 @@ time_s,timestamp,cpu_temp_c,mb_temp_c,gpu_edge_c,gpu_junction_c,gpu_mem_c,gpu_po
 
 Missing sensor values are written as `NaN` to keep column alignment safe for plotting and post-processing.
 
-## 4) Plot Data
+## 6) Plot Data
 
 Temperature plot (interactive):
 
@@ -101,7 +159,7 @@ gnuplot \
 gnuplot/fan.gnuplot
 ```
 
-## 5) Workload Scenarios
+## 7) Workload Scenarios
 
 ### Idle baseline
 
@@ -128,7 +186,7 @@ chmod +x scripts/run_openbenchmark.sh
 The script uses `phoronix-test-suite batch-run` and defaults to 3 runs per test.
 Override with `FORCE_TIMES_TO_RUN=<n>`.
 
-## 6) Repeatability Rules (Before/After)
+## 8) Repeatability Rules (Before/After)
 
 - Keep BIOS fan curves identical between runs.
 - Keep ambient room temperature as close as possible.
@@ -139,13 +197,14 @@ Override with `FORCE_TIMES_TO_RUN=<n>`.
 
 Use [BENCHMARK_CHECKLIST.md](BENCHMARK_CHECKLIST.md) during execution.
 
-## 7) Lightweight Validation
+## 9) Lightweight Validation
 
 Run quick checks before collecting final comparison data:
 
 ```bash
 bash -n logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh
-shellcheck logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh
+bash -n scripts/benchmark.sh
+shellcheck logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh scripts/benchmark.sh
 gnuplot -e "file='data/stock_stress.csv';out='results/smoke_temp.png'" gnuplot/temperature.gnuplot
 gnuplot -e "file='data/stock_stress.csv';out='results/smoke_fan.png'" gnuplot/fan.gnuplot
 ```

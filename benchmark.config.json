@@ -1,0 +1,12 @@
+{
+  "interval_s": 1,
+  "output_dir": "data",
+  "results_dir": "results",
+  "mb_chip_pattern": "auto",
+  "gpu_chip_pattern": "auto",
+  "stress_duration_s": 900,
+  "stress_cpu_workers": 0,
+  "stress_gpu_workers": 1,
+  "openbenchmark_scenario": "cpu",
+  "openbenchmark_runs": 3
+}
