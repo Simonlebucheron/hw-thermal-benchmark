@@ -21,6 +21,9 @@ if (strlen(ambient_temp) > 0) set title sprintf("Fan Speed - %s (ambient %.1f°C
 
 set xlabel "Time (s)"
 set ylabel "RPM"
+set y2label "Power (W)"
+set y2tics
+set ytics nomirror
 
 set grid
 set key outside
@@ -30,7 +33,8 @@ plot \
 file every ::1 using 1:9 with lines lw 2 title "CPU fan", \
 file every ::1 using 1:10 with lines lw 2 title "Case fan 1", \
 file every ::1 using 1:11 with lines lw 2 title "Case fan 2", \
-file every ::1 using 1:12 with lines lw 2 title "GPU fan"
+file every ::1 using 1:12 with lines lw 2 title "GPU fan", \
+file every ::1 using 1:8 axes x1y2 with lines lw 2 lc rgb "#d1495b" title "GPU Power"
 
 
 unset output

@@ -7,6 +7,7 @@ OUTFILE="${1:-benchmark.csv}"
 CPU_LABEL="${CPU_LABEL:-Package id 0:}"
 MB_CHIP_PATTERN="${MB_CHIP_PATTERN:-nct6791-isa-0290}"
 GPU_CHIP_PATTERN="${GPU_CHIP_PATTERN:-amdgpu-pci-0300}"
+GPU_POWER_ENABLED="${GPU_POWER_ENABLED:-true}"
 
 CSV_HEADER="time_s,timestamp,cpu_temp_c,mb_temp_c,gpu_edge_c,gpu_junction_c,gpu_mem_c,gpu_power_w,cpu_fan_rpm,case_fan1_rpm,case_fan2_rpm,gpu_fan_rpm"
 CSV_NAN_ROW="NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN"
@@ -38,7 +39,7 @@ cleanup() {
 }
 
 extract_metrics() {
-    awk -v cpu_label="$CPU_LABEL" -v mb_chip_pattern="$MB_CHIP_PATTERN" -v gpu_chip_pattern="$GPU_CHIP_PATTERN" '
+    awk -v cpu_label="$CPU_LABEL" -v mb_chip_pattern="$MB_CHIP_PATTERN" -v gpu_chip_pattern="$GPU_CHIP_PATTERN" -v gpu_power_enabled="$GPU_POWER_ENABLED" '
         function clean_num(v) {
             gsub(/[^0-9.\-]/, "", v)
             return (v == "" ? "NaN" : v)
@@ -66,7 +67,7 @@ extract_metrics() {
         section == "gpu" && /^edge:/ { gpu_edge = clean_num($2) }
         section == "gpu" && /^junction:/ { gpu_junction = clean_num($2) }
         section == "gpu" && /^mem:/ { gpu_mem = clean_num($2) }
-        section == "gpu" && /^PPT:/ { gpu_power = clean_num($2) }
+        section == "gpu" && gpu_power_enabled == "true" && /^PPT:/ { gpu_power = clean_num($2) }
         section == "gpu" && /^fan1:/ { gpu_fan = clean_num($2) }
 
         END {

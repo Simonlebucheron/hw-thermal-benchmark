@@ -25,6 +25,9 @@ if (strlen(ambient_temp) > 0) set title sprintf("Temperatures - %s (ambient %.1f
 
 set xlabel "Time (s)"
 set ylabel "Temperature (°C)"
+set y2label "Power (W)"
+set y2tics
+set ytics nomirror
 
 set grid
 set key outside
@@ -35,7 +38,8 @@ file every ::1 using 1:3 with lines lw 2 title "CPU", \
 file every ::1 using 1:4 with lines lw 2 title "Motherboard", \
 file every ::1 using 1:5 with lines lw 2 title "GPU Edge", \
 file every ::1 using 1:6 with lines lw 2 title "GPU Junction", \
-file every ::1 using 1:7 with lines lw 2 title "GPU Memory"
+file every ::1 using 1:7 with lines lw 2 title "GPU Memory", \
+file every ::1 using 1:8 axes x1y2 with lines lw 2 lc rgb "#d1495b" title "GPU Power"
 
 
 unset output

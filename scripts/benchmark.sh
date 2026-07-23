@@ -142,11 +142,12 @@ start_capture() {
     local label
     label="$(sanitize_label "$raw_label")"
 
-    local output_dir interval timestamp out_file meta_file mb_chip gpu_chip ambient_temp
+    local output_dir interval timestamp out_file meta_file mb_chip gpu_chip gpu_power_enabled ambient_temp
     output_dir="$(read_cfg "output_dir" "data")"
     interval="$(read_cfg "interval_s" "1")"
     mb_chip="$(read_cfg "mb_chip_pattern" "auto")"
     gpu_chip="$(read_cfg "gpu_chip_pattern" "auto")"
+    gpu_power_enabled="$(read_cfg "gpu_power_enabled" "true")"
     ambient_temp="$(prompt_ambient_temperature)"
 
     if [[ "$mb_chip" == "auto" ]]; then
@@ -183,11 +184,13 @@ start_capture() {
     echo "  interval_s: $interval"
     echo "  mb_chip_pattern: $mb_chip"
     echo "  gpu_chip_pattern: $gpu_chip"
+    echo "  gpu_power_enabled: $gpu_power_enabled"
     echo "  meta_file: $meta_file"
 
     INTERVAL="$interval" \
     MB_CHIP_PATTERN="$mb_chip" \
     GPU_CHIP_PATTERN="$gpu_chip" \
+    GPU_POWER_ENABLED="$gpu_power_enabled" \
     exec "$ROOT_DIR/logger_rpm.sh" "$out_file"
 }
 
@@ -224,6 +227,7 @@ doctor() {
     echo "Effective defaults:"
     echo "  interval_s: $(read_cfg "interval_s" "1")"
     echo "  output_dir: $(read_cfg "output_dir" "data")"
+    echo "  gpu_power_enabled: $(read_cfg "gpu_power_enabled" "true")"
     echo "  openbenchmark.category: $(read_cfg "openbenchmark.category" "cpu")"
     echo "  openbenchmark.runs: $(read_cfg "openbenchmark.runs" "3")"
     echo "  openbenchmark.tests: $(read_cfg "openbenchmark.tests" "")"
