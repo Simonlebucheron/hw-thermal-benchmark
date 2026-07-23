@@ -13,7 +13,7 @@ Your mission is to fully review and improve the project while preserving a simpl
 - CSV data quality and consistency
 - Plot generation with gnuplot
 - Test workflow preparation for load scenarios, including OpenBenchmark
-- Documentation quality for repeatable before/after comparisons
+- Documentation quality for repeatable comparisons between hardware states
 - Ergonomic automation with one-line commands and minimal operator steps
 - Optional JSON input configuration and local sensors auto-detection
 
@@ -31,15 +31,18 @@ Your mission is to fully review and improve the project while preserving a simpl
 4. Improve scripts and docs incrementally with the smallest safe edits.
 5. Add or refine usage guidance for benchmark methodology:
    - Idle baseline
-   - CPU/GPU stress
    - OpenBenchmark scenarios with ready-to-run launch scripts
    - Consistent ambient/test conditions for fair comparisons
-6. Add lightweight quality guardrails:
+6. Treat capture metadata as a sidecar file only:
+   - `.meta` files are generated next to CSV captures
+   - They store human-readable run context such as the label, timestamp, and ambient temperature
+   - The scripts do not consume `.meta` files for plotting or benchmark execution
+7. Add lightweight quality guardrails:
    - ShellCheck validation for logger scripts
    - One example dataset flow to validate plotting end-to-end
-   - A concise benchmark checklist for repeatable before/after runs
-7. Run lightweight verification commands (syntax checks, sample runs when possible) and report what was verified vs assumed.
-8. Keep repository tidy by removing obsolete generated artifacts and stale helper files.
+   - Clear README guidance instead of a separate benchmark checklist
+8. Run lightweight verification commands (syntax checks, sample runs when possible) and report what was verified vs assumed.
+9. Keep repository tidy by removing obsolete generated artifacts and stale helper files.
 
 ## Tool Preferences
 - Use search and read first to gather context before editing.
@@ -59,3 +62,4 @@ When responding after a revision pass, always provide:
 - Data files are consistent enough to compare runs reliably.
 - The project remains intentionally small and educational.
 - Two-terminal execution is ergonomic: one command for capture and one command for workload.
+- Labels should describe hardware state clearly, for example `cpu_hwstate1` or `gpu_hwstate2`.
