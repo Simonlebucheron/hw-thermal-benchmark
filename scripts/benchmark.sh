@@ -4,6 +4,9 @@ set -u -o pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_FILE="${BENCH_CONFIG:-$ROOT_DIR/benchmark.config.json}"
+RUN_LOGGER_PID=""
+RUN_SENSOR_PANE_ID=""
+RUN_CLEANUP_DONE=0
 
 require_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -112,6 +115,7 @@ Usage:
   ./scripts/benchmark.sh commands <label>
   ./scripts/benchmark.sh start <label>
     ./scripts/benchmark.sh load [cpu|gpu|system]
+    ./scripts/benchmark.sh run <label> [cpu|gpu|system]
   ./scripts/benchmark.sh doctor
 
 Examples:
@@ -119,6 +123,7 @@ Examples:
     ./scripts/benchmark.sh start cpu_hwstate1
     ./scripts/benchmark.sh load
     ./scripts/benchmark.sh load cpu
+    ./scripts/benchmark.sh run cpu_hwstate1 cpu
 EOF
 }
 
@@ -135,20 +140,14 @@ print_commands() {
     echo
     echo "Terminal B (workload - OpenBenchmark):"
     echo "./scripts/benchmark.sh load $category"
+    echo
+    echo "Single terminal (auto trigger before/after load):"
+    echo "./scripts/benchmark.sh run $label $category"
 }
 
-start_capture() {
-    local raw_label="$1"
-    local label
-    label="$(sanitize_label "$raw_label")"
-
-    local output_dir interval timestamp out_file meta_file mb_chip gpu_chip gpu_power_enabled ambient_temp
-    output_dir="$(read_cfg "output_dir" "data")"
-    interval="$(read_cfg "interval_s" "1")"
-    mb_chip="$(read_cfg "mb_chip_pattern" "auto")"
-    gpu_chip="$(read_cfg "gpu_chip_pattern" "auto")"
-    gpu_power_enabled="$(read_cfg "gpu_power_enabled" "true")"
-    ambient_temp="$(prompt_ambient_temperature)"
+detect_capture_chips() {
+    local mb_chip="$1"
+    local gpu_chip="$2"
 
     if [[ "$mb_chip" == "auto" ]]; then
         mb_chip="$(detect_mb_chip)"
@@ -163,40 +162,171 @@ start_capture() {
         exit 1
     fi
 
-    timestamp="$(date '+%Y%m%d_%H%M%S')"
-    mkdir -p "$ROOT_DIR/$output_dir"
-    out_file="$ROOT_DIR/$output_dir/${label}_${timestamp}.csv"
-    meta_file="${out_file%.csv}.meta"
+    printf '%s,%s\n' "$mb_chip" "$gpu_chip"
+}
+
+prepare_capture_context() {
+    local raw_label="$1"
+    local ambient_temp="$2"
+    local chips mb_chip gpu_chip
+
+    CAP_LABEL="$(sanitize_label "$raw_label")"
+    CAP_OUTPUT_DIR="$(read_cfg "output_dir" "data")"
+    CAP_INTERVAL="$(read_cfg "interval_s" "1")"
+    CAP_GPU_POWER_ENABLED="$(read_cfg "gpu_power_enabled" "true")"
+    mb_chip="$(read_cfg "mb_chip_pattern" "auto")"
+    gpu_chip="$(read_cfg "gpu_chip_pattern" "auto")"
+
+    chips="$(detect_capture_chips "$mb_chip" "$gpu_chip")"
+    CAP_MB_CHIP="${chips%%,*}"
+    CAP_GPU_CHIP="${chips#*,}"
+
+    CAP_TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
+    mkdir -p "$ROOT_DIR/$CAP_OUTPUT_DIR"
+    CAP_OUT_FILE="$ROOT_DIR/$CAP_OUTPUT_DIR/${CAP_LABEL}_${CAP_TIMESTAMP}.csv"
+    CAP_META_FILE="${CAP_OUT_FILE%.csv}.meta"
 
     {
-        printf 'label=%s\n' "$label"
-        printf 'timestamp=%s\n' "$timestamp"
+        printf 'label=%s\n' "$CAP_LABEL"
+        printf 'timestamp=%s\n' "$CAP_TIMESTAMP"
         printf 'ambient_temp_c=%s\n' "${ambient_temp:-}"
-    } > "$meta_file"
+    } > "$CAP_META_FILE"
+}
 
-    echo "Starting capture"
-    echo "  file: $out_file"
+start_logger() {
+    local mode="$1"
+    local live_preview="${2:-false}"
+
+    if [[ "$mode" == "foreground" ]]; then
+        INTERVAL="$CAP_INTERVAL" \
+        MB_CHIP_PATTERN="$CAP_MB_CHIP" \
+        GPU_CHIP_PATTERN="$CAP_GPU_CHIP" \
+        GPU_POWER_ENABLED="$CAP_GPU_POWER_ENABLED" \
+        exec "$ROOT_DIR/logger_rpm.sh" "$CAP_OUT_FILE"
+    fi
+
+    INTERVAL="$CAP_INTERVAL" \
+    MB_CHIP_PATTERN="$CAP_MB_CHIP" \
+    GPU_CHIP_PATTERN="$CAP_GPU_CHIP" \
+    GPU_POWER_ENABLED="$CAP_GPU_POWER_ENABLED" \
+    LIVE_TERMINAL="$live_preview" \
+    "$ROOT_DIR/logger_rpm.sh" "$CAP_OUT_FILE" &
+}
+
+cleanup_run_resources() {
+    if (( RUN_CLEANUP_DONE == 1 )); then
+        return 0
+    fi
+    RUN_CLEANUP_DONE=1
+
+    if [[ -n "$RUN_LOGGER_PID" ]]; then
+        stop_process_with_timeout "$RUN_LOGGER_PID" "logger_rpm" 5
+        RUN_LOGGER_PID=""
+    fi
+
+    if [[ -n "$RUN_SENSOR_PANE_ID" ]] && command -v tmux >/dev/null 2>&1; then
+        tmux kill-pane -t "$RUN_SENSOR_PANE_ID" >/dev/null 2>&1 || true
+        RUN_SENSOR_PANE_ID=""
+    fi
+}
+
+stop_process_with_timeout() {
+    local pid="$1"
+    local name="$2"
+    local timeout_s="${3:-5}"
+    local ticks i
+
+    if [[ -z "$pid" ]]; then
+        return 0
+    fi
+    if ! [[ "$timeout_s" =~ ^[0-9]+$ ]] || (( timeout_s <= 0 )); then
+        timeout_s=5
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+        wait "$pid" 2>/dev/null || true
+        return 0
+    fi
+
+    kill -TERM "$pid" 2>/dev/null || true
+    ticks=$((timeout_s * 10))
+    for ((i = 0; i < ticks; i++)); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" 2>/dev/null || true
+            return 0
+        fi
+        sleep 0.1
+    done
+
+    echo "Process $name ($pid) did not exit after ${timeout_s}s, forcing kill." >&2
+    kill -KILL "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+}
+
+handle_run_signal() {
+    local signal_name="$1"
+    local exit_code=130
+    if [[ "$signal_name" == "TERM" ]]; then
+        exit_code=143
+    fi
+
+    cleanup_run_resources
+    trap - INT TERM EXIT
+    exit "$exit_code"
+}
+
+start_sensor_tmux_pane() {
+    local tail_cmd pane_id
+
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "sensor_display_mode=tmux requested but tmux is not installed; continuing without live sensor pane." >&2
+        return 0
+    fi
+
+    if [[ -z "${TMUX:-}" ]]; then
+        echo "sensor_display_mode=tmux requested but no active tmux session detected; continuing without live sensor pane." >&2
+        return 0
+    fi
+
+    tail_cmd="tail -n +2 -f \"$CAP_OUT_FILE\" | awk -F, '{printf \"[t=%ss] CPU=%sC MB=%sC GPU=%sC GPU_PWR=%sW CPU_PWR=%sW PWR=%sW\\n\", \$1, \$3, \$4, \$5, \$8, \$13, \$14}'"
+    pane_id="$(tmux split-window -v -P -F '#{pane_id}' "$tail_cmd")"
+    RUN_SENSOR_PANE_ID="$pane_id"
+
+    if [[ -n "${TMUX_PANE:-}" ]]; then
+        tmux select-pane -t "$TMUX_PANE" >/dev/null 2>&1 || true
+    fi
+}
+
+print_capture_info() {
+    local ambient_temp="$1"
+
+    echo "  file: $CAP_OUT_FILE"
     if [[ -n "$ambient_temp" ]]; then
         echo "  ambient_temp_c: $ambient_temp"
     else
         echo "  ambient_temp_c: skipped"
     fi
-    echo "  interval_s: $interval"
-    echo "  mb_chip_pattern: $mb_chip"
-    echo "  gpu_chip_pattern: $gpu_chip"
-    echo "  gpu_power_enabled: $gpu_power_enabled"
-    echo "  meta_file: $meta_file"
+    echo "  interval_s: $CAP_INTERVAL"
+    echo "  mb_chip_pattern: $CAP_MB_CHIP"
+    echo "  gpu_chip_pattern: $CAP_GPU_CHIP"
+    echo "  gpu_power_enabled: $CAP_GPU_POWER_ENABLED"
+    echo "  meta_file: $CAP_META_FILE"
+}
 
-    INTERVAL="$interval" \
-    MB_CHIP_PATTERN="$mb_chip" \
-    GPU_CHIP_PATTERN="$gpu_chip" \
-    GPU_POWER_ENABLED="$gpu_power_enabled" \
-    exec "$ROOT_DIR/logger_rpm.sh" "$out_file"
+start_capture() {
+    local raw_label="$1"
+    local ambient_temp
+    ambient_temp="$(prompt_ambient_temperature)"
+    prepare_capture_context "$raw_label" "$ambient_temp"
+
+    echo "Starting capture"
+    print_capture_info "$ambient_temp"
+
+    start_logger "foreground"
 }
 
 run_openbenchmark() {
     local category="${1:-}"
-    local cfg_category cfg_runs cfg_tests
+    local cfg_category cfg_runs cfg_tests tests_csv
     cfg_category="$(read_cfg "openbenchmark.category" "cpu")"
     cfg_runs="$(read_cfg "openbenchmark.runs" "3")"
     cfg_tests="$(read_cfg "openbenchmark.tests" "")"
@@ -205,11 +335,110 @@ run_openbenchmark() {
         category="$cfg_category"
     fi
 
-    FORCE_TIMES_TO_RUN="$cfg_runs" OPENBENCHMARK_TESTS_CSV="$cfg_tests" exec "$ROOT_DIR/scripts/run_openbenchmark.sh" "$category"
+    # If category is explicitly overridden, avoid forcing tests from config
+    # unless the caller passed OPENBENCHMARK_TESTS_CSV manually.
+    if [[ -n "${OPENBENCHMARK_TESTS_CSV:-}" ]]; then
+        tests_csv="${OPENBENCHMARK_TESTS_CSV:-}"
+    elif [[ -n "${1:-}" && "$category" != "$cfg_category" ]]; then
+        tests_csv=""
+    else
+        tests_csv="$cfg_tests"
+    fi
+
+    FORCE_TIMES_TO_RUN="$cfg_runs" OPENBENCHMARK_TESTS_CSV="$tests_csv" "$ROOT_DIR/scripts/run_openbenchmark.sh" "$category"
 }
 
-run_load() {
-    run_openbenchmark "${1:-}"
+sleep_with_message() {
+    local seconds="$1"
+    local message="$2"
+
+    if ! [[ "$seconds" =~ ^[0-9]+$ ]]; then
+        echo "Invalid seconds value: $seconds" >&2
+        return 1
+    fi
+    if (( seconds <= 0 )); then
+        return 0
+    fi
+
+    echo "$message (${seconds}s)"
+    sleep "$seconds"
+}
+
+run_capture_and_load() {
+    local raw_label="$1"
+    local category="${2:-}"
+    local ambient_temp
+    local pre_trigger_s post_trigger_s live_preview sensor_display_mode logger_live
+
+    pre_trigger_s="$(read_cfg "trigger_pre_s" "60")"
+    post_trigger_s="$(read_cfg "trigger_post_s" "60")"
+    live_preview="$(read_cfg "live_preview" "true")"
+    sensor_display_mode="$(read_cfg "sensor_display_mode" "off")"
+    ambient_temp="$(prompt_ambient_temperature)"
+    prepare_capture_context "$raw_label" "$ambient_temp"
+
+    RUN_LOGGER_PID=""
+    RUN_SENSOR_PANE_ID=""
+    RUN_CLEANUP_DONE=0
+    trap 'handle_run_signal INT' INT
+    trap 'handle_run_signal TERM' TERM
+    trap 'cleanup_run_resources' EXIT
+
+    case "$sensor_display_mode" in
+        off)
+            logger_live="false"
+            ;;
+        inline)
+            logger_live="$live_preview"
+            ;;
+        tmux)
+            logger_live="false"
+            ;;
+        *)
+            echo "Unknown sensor_display_mode: $sensor_display_mode (expected: off|inline|tmux)." >&2
+            trap - INT TERM EXIT
+            return 1
+            ;;
+    esac
+
+    echo "Starting automated benchmark"
+    print_capture_info "$ambient_temp"
+    echo "  category: ${category:-auto}"
+    echo "  pre_trigger_s: $pre_trigger_s"
+    echo "  post_trigger_s: $post_trigger_s"
+    echo "  live_preview: $live_preview"
+    echo "  sensor_display_mode: $sensor_display_mode"
+
+    local load_rc=0
+    start_logger "background" "$logger_live"
+    RUN_LOGGER_PID=$!
+
+    if [[ "$sensor_display_mode" == "tmux" ]]; then
+        start_sensor_tmux_pane
+    fi
+
+    if ! sleep_with_message "$pre_trigger_s" "Stabilizing before load"; then
+        cleanup_run_resources
+        trap - INT TERM EXIT
+        return 1
+    fi
+
+    if ! run_openbenchmark "$category"; then
+        load_rc=$?
+    fi
+
+    if ! sleep_with_message "$post_trigger_s" "Cooling capture after load"; then
+        load_rc=1
+    fi
+
+    cleanup_run_resources
+    trap - INT TERM EXIT
+
+    echo "Capture completed: $CAP_OUT_FILE"
+    if (( load_rc != 0 )); then
+        echo "Workload finished with non-zero status: $load_rc" >&2
+        return "$load_rc"
+    fi
 }
 
 doctor() {
@@ -228,6 +457,10 @@ doctor() {
     echo "  interval_s: $(read_cfg "interval_s" "1")"
     echo "  output_dir: $(read_cfg "output_dir" "data")"
     echo "  gpu_power_enabled: $(read_cfg "gpu_power_enabled" "true")"
+    echo "  trigger_pre_s: $(read_cfg "trigger_pre_s" "60")"
+    echo "  trigger_post_s: $(read_cfg "trigger_post_s" "60")"
+    echo "  live_preview: $(read_cfg "live_preview" "true")"
+    echo "  sensor_display_mode: $(read_cfg "sensor_display_mode" "off")"
     echo "  openbenchmark.category: $(read_cfg "openbenchmark.category" "cpu")"
     echo "  openbenchmark.runs: $(read_cfg "openbenchmark.runs" "3")"
     echo "  openbenchmark.tests: $(read_cfg "openbenchmark.tests" "")"
@@ -253,7 +486,15 @@ main() {
             start_capture "$2"
             ;;
         load)
-            run_load "${2:-}"
+            run_openbenchmark "${2:-}"
+            ;;
+        run)
+            if [[ -z "${2:-}" ]]; then
+                echo "Missing label." >&2
+                usage
+                exit 1
+            fi
+            run_capture_and_load "$2" "${3:-}"
             ;;
         doctor)
             doctor

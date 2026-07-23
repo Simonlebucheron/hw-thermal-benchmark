@@ -5,9 +5,13 @@
   "mb_chip_pattern": "auto",
   "gpu_chip_pattern": "auto",
   "gpu_power_enabled": true,
+  "trigger_pre_s": 10,
+  "trigger_post_s": 10,
+  "live_preview": true,
+  "sensor_display_mode": "off",
   "openbenchmark": {
     "category": "cpu",
     "runs": 3,
-    "tests": ["build-linux-kernel"]
+    "tests": []
   }
 }
