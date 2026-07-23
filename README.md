@@ -1,6 +1,6 @@
 # Hardware Thermal Benchmark Logger
 
-Linux-only tools for simple before/after thermal comparisons.
+Linux-only tools for simple thermal comparisons between hardware states.
 
 The workflow is intentionally small:
 
@@ -22,16 +22,16 @@ sensors
 
 ## Quick Start
 
-Pick a label for the run:
+Pick a label that describes the hardware state:
 
 ```bash
-./scripts/benchmark.sh commands before_cpu
+./scripts/benchmark.sh commands cpu_hwstate1
 ```
 
 Then use two terminals:
 
 ```bash
-./scripts/benchmark.sh start before_cpu
+./scripts/benchmark.sh start cpu_hwstate1
 ```
 
 ```bash
@@ -40,6 +40,7 @@ Then use two terminals:
 
 At the start of capture, the script asks for an ambient temperature in `degC`. Press Enter to skip and continue.
 A small `.meta` file is written next to the CSV with the label, timestamp, and ambient temperature if provided.
+It is a generated sidecar, ignored by git, and not consumed by the plotting or benchmark scripts.
 
 ## Configuration
 
@@ -85,19 +86,20 @@ CSV files are written to `data/` by default.
 Plot the CSV without specifying an output name and the script will create a file linked to the input name:
 
 ```bash
-gnuplot -e "file='data/before_cpu_20260723_195045.csv'" gnuplot/temperature.gnuplot
-gnuplot -e "file='data/before_cpu_20260723_195045.csv'" gnuplot/fan.gnuplot
+gnuplot -e "file='data/cpu_hwstate1_20260723_195045.csv'" gnuplot/temperature.gnuplot
+gnuplot -e "file='data/cpu_hwstate1_20260723_195045.csv'" gnuplot/fan.gnuplot
 ```
 
 That produces files such as:
 
-- `results/before_cpu_20260723_195045_temperature.png`
-- `results/before_cpu_20260723_195045_fan.png`
+- `results/cpu_hwstate1_20260723_195045_temperature.png`
+- `results/cpu_hwstate1_20260723_195045_fan.png`
 
 If you want a custom destination, pass `out=` explicitly.
 
 ## Notes
 
+- Use labels that describe the hardware state, such as `cpu_hwstate1` or `gpu_hwstate2`.
 - Keep BIOS fan curves identical between runs.
 - Keep ambient room temperature as close as possible.
 - Keep case panel state identical.

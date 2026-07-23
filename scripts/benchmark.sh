@@ -115,8 +115,8 @@ Usage:
   ./scripts/benchmark.sh doctor
 
 Examples:
-  ./scripts/benchmark.sh commands before_cpu
-  ./scripts/benchmark.sh start before_cpu
+    ./scripts/benchmark.sh commands cpu_hwstate1
+    ./scripts/benchmark.sh start cpu_hwstate1
     ./scripts/benchmark.sh load
     ./scripts/benchmark.sh load cpu
 EOF
