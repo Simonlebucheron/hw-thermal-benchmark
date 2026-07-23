@@ -1,0 +1,12 @@
+{
+  "interval_s": 1,
+  "output_dir": "data",
+  "results_dir": "results",
+  "mb_chip_pattern": "auto",
+  "gpu_chip_pattern": "auto",
+  "openbenchmark": {
+    "category": "cpu",
+    "runs": 3,
+    "tests": ["build-linux-kernel"]
+  }
+}

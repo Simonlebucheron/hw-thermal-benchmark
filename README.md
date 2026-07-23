@@ -1,151 +1,113 @@
 # Hardware Thermal Benchmark Logger
 
-Small Linux thermal benchmark tools for repeatable before/after hardware comparisons.
+Linux-only tools for simple before/after thermal comparisons.
 
-The core logger is `logger_rpm.sh`.
-`logger_pwm.sh` is kept as a compatibility entrypoint and forwards to `logger_rpm.sh`.
+The workflow is intentionally small:
 
-## 1) Requirements
+- `logger_rpm.sh` captures sensors to CSV
+- `scripts/benchmark.sh` starts capture and launches the workload
+- `scripts/run_openbenchmark.sh` runs standard Phoronix Test Suite benchmarks
 
-Mandatory:
-
-```bash
-sudo apt install lm-sensors gnuplot
-```
-
-Optional workload tools:
+## Requirements
 
 ```bash
-sudo apt install stress-ng phoronix-test-suite
+sudo apt install lm-sensors gnuplot phoronix-test-suite
 ```
 
-Quick check:
+Check sensors before a run:
 
 ```bash
 sensors
 ```
 
-## 2) Record Data
+## Quick Start
 
-Create output folder:
-
-```bash
-mkdir -p data results
-```
-
-Start logging (default interval: 1 second):
+Pick a label for the run:
 
 ```bash
-./logger_rpm.sh data/stock_idle.csv
+./scripts/benchmark.sh commands before_cpu
 ```
 
-Change sampling interval (seconds):
+Then use two terminals:
 
 ```bash
-INTERVAL=2 ./logger_rpm.sh data/stock_idle_2s.csv
+./scripts/benchmark.sh start before_cpu
 ```
-
-Stop logging with Ctrl+C.
-
-### Sensor Label Overrides
-
-If your chip names differ, override patterns without editing scripts:
 
 ```bash
-MB_CHIP_PATTERN='it8688-isa-0a30' \
-GPU_CHIP_PATTERN='amdgpu-pci-0300' \
-./logger_rpm.sh data/custom.csv
+./scripts/benchmark.sh load cpu
 ```
 
-## 3) CSV Format
+At the start of capture, the script asks for an ambient temperature in `degC`. Press Enter to skip and continue.
+A small `.meta` file is written next to the CSV with the label, timestamp, and ambient temperature if provided.
 
-Header (stable order):
+## Configuration
 
-```text
-time_s,timestamp,cpu_temp_c,mb_temp_c,gpu_edge_c,gpu_junction_c,gpu_mem_c,gpu_power_w,cpu_fan_rpm,case_fan1_rpm,case_fan2_rpm,gpu_fan_rpm
+Default config file: [benchmark.config.json](benchmark.config.json)
+
+Keys used by the simplified workflow:
+
+- `interval_s`
+- `output_dir`
+- `mb_chip_pattern`
+- `gpu_chip_pattern`
+- `openbenchmark.category`
+- `openbenchmark.runs`
+- `openbenchmark.tests`
+
+Example:
+
+```json
+{
+  "interval_s": 1,
+  "output_dir": "data",
+  "results_dir": "results",
+  "mb_chip_pattern": "auto",
+  "gpu_chip_pattern": "auto",
+  "openbenchmark": {
+    "category": "cpu",
+    "runs": 3,
+    "tests": ["build-linux-kernel"]
+  }
+}
 ```
 
-Missing sensor values are written as `NaN` to keep column alignment safe for plotting and post-processing.
+If `openbenchmark.tests` is empty, the script uses category defaults:
 
-## 4) Plot Data
+- cpu: `build-linux-kernel`, `compress-zstd`
+- gpu: `glmark2`, `unigine-heaven`
+- system: `build-linux-kernel`, `openssl`
 
-Temperature plot (interactive):
+## Outputs
+
+CSV files are written to `data/` by default.
+
+Plot the CSV without specifying an output name and the script will create a file linked to the input name:
 
 ```bash
-gnuplot -p \
--e "file='data/stock_stress.csv'" \
-gnuplot/temperature.gnuplot
+gnuplot -e "file='data/before_cpu_20260723_195045.csv'" gnuplot/temperature.gnuplot
+gnuplot -e "file='data/before_cpu_20260723_195045.csv'" gnuplot/fan.gnuplot
 ```
 
-Temperature plot (PNG):
+That produces files such as:
 
-```bash
-gnuplot \
--e "file='data/stock_stress.csv';out='results/stock_stress_temperature.png'" \
-gnuplot/temperature.gnuplot
-```
+- `results/before_cpu_20260723_195045_temperature.png`
+- `results/before_cpu_20260723_195045_fan.png`
 
-Fan plot (interactive):
+If you want a custom destination, pass `out=` explicitly.
 
-```bash
-gnuplot -p \
--e "file='data/stock_stress.csv'" \
-gnuplot/fan.gnuplot
-```
-
-Fan plot (PNG):
-
-```bash
-gnuplot \
--e "file='data/stock_stress.csv';out='results/stock_stress_fan.png'" \
-gnuplot/fan.gnuplot
-```
-
-## 5) Workload Scenarios
-
-### Idle baseline
-
-1. Let system settle for 10 to 15 minutes at desktop idle.
-2. Start logger.
-3. Record at least 15 minutes.
-
-### Stress-ng (simple local stress)
-
-```bash
-chmod +x scripts/run_stress_ng.sh
-./scripts/run_stress_ng.sh 900
-```
-
-### OpenBenchmark scenarios
-
-```bash
-chmod +x scripts/run_openbenchmark.sh
-./scripts/run_openbenchmark.sh cpu
-./scripts/run_openbenchmark.sh gpu
-./scripts/run_openbenchmark.sh mixed
-```
-
-The script uses `phoronix-test-suite batch-run` and defaults to 3 runs per test.
-Override with `FORCE_TIMES_TO_RUN=<n>`.
-
-## 6) Repeatability Rules (Before/After)
+## Notes
 
 - Keep BIOS fan curves identical between runs.
 - Keep ambient room temperature as close as possible.
-- Keep case panel state identical (open/closed).
-- Keep workload and duration identical.
+- Keep case panel state identical.
+- Keep workload category or explicit test list identical.
+- Keep benchmark run count identical.
 - Keep sampling interval identical.
-- Record notes for any deviation.
 
-Use [BENCHMARK_CHECKLIST.md](BENCHMARK_CHECKLIST.md) during execution.
-
-## 7) Lightweight Validation
-
-Run quick checks before collecting final comparison data:
+## Validation
 
 ```bash
-bash -n logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh
-shellcheck logger_rpm.sh logger_pwm.sh scripts/run_stress_ng.sh scripts/run_openbenchmark.sh
-gnuplot -e "file='data/stock_stress.csv';out='results/smoke_temp.png'" gnuplot/temperature.gnuplot
-gnuplot -e "file='data/stock_stress.csv';out='results/smoke_fan.png'" gnuplot/fan.gnuplot
+bash -n logger_rpm.sh logger_pwm.sh scripts/run_openbenchmark.sh scripts/benchmark.sh
+shellcheck logger_rpm.sh logger_pwm.sh scripts/run_openbenchmark.sh scripts/benchmark.sh
 ```

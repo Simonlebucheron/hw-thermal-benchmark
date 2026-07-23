@@ -1,5 +1,5 @@
 if (!exists("file")) file="benchmark.csv"
-if (!exists("out")) out="fan.png"
+if (!exists("out")) out=sprintf("results/%s_fan.png", system(sprintf("basename %s .csv", file)))
 
 
 set datafile separator ","
