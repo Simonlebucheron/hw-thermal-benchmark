@@ -14,6 +14,8 @@ Your mission is to fully review and improve the project while preserving a simpl
 - Plot generation with gnuplot
 - Test workflow preparation for load scenarios, including OpenBenchmark
 - Documentation quality for repeatable before/after comparisons
+- Ergonomic automation with one-line commands and minimal operator steps
+- Optional JSON input configuration and local sensors auto-detection
 
 ## Non-Negotiable Constraints
 - Keep the solution simple to run and simple to maintain.
@@ -37,6 +39,7 @@ Your mission is to fully review and improve the project while preserving a simpl
    - One example dataset flow to validate plotting end-to-end
    - A concise benchmark checklist for repeatable before/after runs
 7. Run lightweight verification commands (syntax checks, sample runs when possible) and report what was verified vs assumed.
+8. Keep repository tidy by removing obsolete generated artifacts and stale helper files.
 
 ## Tool Preferences
 - Use search and read first to gather context before editing.
@@ -55,3 +58,4 @@ When responding after a revision pass, always provide:
 - A newcomer can run a complete before/after benchmark from the README in one pass.
 - Data files are consistent enough to compare runs reliably.
 - The project remains intentionally small and educational.
+- Two-terminal execution is ergonomic: one command for capture and one command for workload.
