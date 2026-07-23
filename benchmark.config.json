@@ -4,6 +4,7 @@
   "results_dir": "results",
   "mb_chip_pattern": "auto",
   "gpu_chip_pattern": "auto",
+  "gpu_power_enabled": true,
   "openbenchmark": {
     "category": "cpu",
     "runs": 3,

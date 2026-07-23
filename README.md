@@ -41,37 +41,25 @@ Then use two terminals:
 At the start of capture, the script asks for an ambient temperature in `degC`. Press Enter to skip and continue.
 A small `.meta` file is written next to the CSV with the label, timestamp, and ambient temperature if provided.
 It is a generated sidecar, ignored by git, and not consumed by the plotting or benchmark scripts.
+GPU power capture is enabled by default through `benchmark.config.json` and is plotted on a secondary axis.
 
 ## Configuration
 
 Default config file: [benchmark.config.json](benchmark.config.json)
 
-Keys used by the simplified workflow:
+Summary:
 
-- `interval_s`
-- `output_dir`
-- `mb_chip_pattern`
-- `gpu_chip_pattern`
-- `openbenchmark.category`
-- `openbenchmark.runs`
-- `openbenchmark.tests`
-
-Example:
-
-```json
-{
-  "interval_s": 1,
-  "output_dir": "data",
-  "results_dir": "results",
-  "mb_chip_pattern": "auto",
-  "gpu_chip_pattern": "auto",
-  "openbenchmark": {
-    "category": "cpu",
-    "runs": 3,
-    "tests": ["build-linux-kernel"]
-  }
-}
-```
+| Key | Type | Values | Default | Purpose |
+| --- | --- | --- | --- | --- |
+| `interval_s` | number | Positive number | `1` | Sampling interval in seconds. |
+| `output_dir` | string | Local path | `data` | Directory for CSV captures and `.meta` sidecars. |
+| `results_dir` | string | Local path | `results` | Directory for generated plots. |
+| `mb_chip_pattern` | string | `auto` or a sensors chip name | `auto` | Motherboard sensor chip selection. |
+| `gpu_chip_pattern` | string | `auto` or a sensors chip name | `auto` | GPU sensor chip selection. |
+| `gpu_power_enabled` | boolean | `true`, `false` | `true` | Capture GPU power from `sensors` when available. |
+| `openbenchmark.category` | string | `cpu`, `gpu`, `system` | `cpu` | Default OpenBenchmark category. |
+| `openbenchmark.runs` | integer | Positive number | `3` | Number of benchmark repetitions. |
+| `openbenchmark.tests` | array of strings | Empty or a list of test names | built-in defaults | Explicit test list; `pts/` prefixes are optional. |
 
 If `openbenchmark.tests` is empty, the script uses category defaults:
 
@@ -94,6 +82,8 @@ That produces files such as:
 
 - `results/cpu_hwstate1_20260723_195045_temperature.png`
 - `results/cpu_hwstate1_20260723_195045_fan.png`
+
+The GPU power trace is drawn on the secondary axis in both plots when `gpu_power_enabled` is `true`.
 
 If you want a custom destination, pass `out=` explicitly.
 
