@@ -25,14 +25,20 @@ set title sprintf("Fan Speed - %s", file_base)
 
 if (strlen(ambient_temp) > 0) set title sprintf("Fan Speed - %s (ambient %.1f°C)", file_base, ambient_temp_value)
 
+y1_color = "#111827"
+y2_color = "#b91c1c"
+
 set xlabel "Time (s)"
-set ylabel "RPM"
-set y2label "Power (W)"
+set ylabel "RPM [Y1]" tc rgb y1_color
+set y2label "Power (W) [Y2]" tc rgb y2_color
 set y2tics
-set ytics nomirror
+set ytics nomirror textcolor rgb y1_color
+set y2tics textcolor rgb y2_color
 
 set grid
 set key outside
+set label 201 "Y1 = thick solid lines" at graph 0.01,0.98 tc rgb y1_color front
+set label 202 "Y2 = thin solid lines" at graph 0.01,0.94 tc rgb y2_color front
 
 axis_stats = system(sprintf("awk -F, 'NR>1 {for (i=9; i<=12; i++) {if ($i ~ /^-?[0-9]+([.][0-9]+)?$/) {v=$i+0; if (!yset || v<ymin) ymin=v; if (!yset || v>ymax) ymax=v; yset=1}} for (i=1; i<=3; i++) {col=(i==1?8:(i==2?13:14)); val=$col; if (val ~ /^-?[0-9]+([.][0-9]+)?$/) {p=val+0; if (!pset || p<y2min) y2min=p; if (!pset || p>y2max) y2max=p; pset=1}}} END {if (!yset) {ymin=0; ymax=1000}; if (!pset) {y2min=0; y2max=100}; printf \"%%.6f %%.6f %%.6f %%.6f\", ymin, ymax, y2min, y2max}' '%s'", file))
 y_min = real(word(axis_stats, 1))
@@ -59,13 +65,13 @@ set y2range [y2_min - y2_pad:y2_max + y2_pad]
 
 
 plot \
-file every ::1 using 1:9 with lines lw 2 title "CPU fan", \
-file every ::1 using 1:10 with lines lw 2 title "Case fan 1", \
-file every ::1 using 1:11 with lines lw 2 title "Case fan 2", \
-file every ::1 using 1:12 with lines lw 2 title "GPU fan", \
-file every ::1 using 1:8 axes x1y2 with lines lw 2 lc rgb "#d1495b" title "GPU Power", \
-file every ::1 using 1:13 axes x1y2 with lines lw 2 lc rgb "#3b82f6" title "CPU Power", \
-file every ::1 using 1:14 axes x1y2 with lines lw 2 lc rgb "#1f7a1f" title "Platform Power"
+file every ::1 using 1:9 with lines lw 2 lc rgb "#ef4444" title "[Y1] CPU fan", \
+file every ::1 using 1:10 with lines lw 2 lc rgb "#f59e0b" title "[Y1] Case fan 1", \
+file every ::1 using 1:11 with lines lw 2 lc rgb "#22c55e" title "[Y1] Case fan 2", \
+file every ::1 using 1:12 with lines lw 2 lc rgb "#06b6d4" title "[Y1] GPU fan", \
+file every ::1 using 1:8 axes x1y2 with lines lw 1 lc rgb "#d1495b" title "[Y2] GPU Power", \
+file every ::1 using 1:13 axes x1y2 with lines lw 1 lc rgb "#3b82f6" title "[Y2] CPU Power", \
+file every ::1 using 1:14 axes x1y2 with lines lw 1 lc rgb "#1f7a1f" title "[Y2] Platform Power"
 
 
 unset output
