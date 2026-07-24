@@ -1,0 +1,30 @@
+{
+  "interval_s": 1,
+  "output_dir": "data",
+  "results_dir": "results",
+  "mb_chip_pattern": "auto",
+  "gpu_chip_pattern": "auto",
+  "gpu_power_enabled": true,
+  "trigger_pre_s": 10,
+  "trigger_post_s": 120,
+  "live_preview": true,
+  "sensor_display_mode": "off",
+  "openbenchmark": {
+    "default_category": "cpu",
+    "runs": 1,
+    "tests": {
+      "cpu": [
+        "build-linux-kernel",
+        "compress-zstd"
+      ],
+      "gpu": [
+        "3dmark",
+        "unigine-heaven"
+      ],
+      "system": [
+        "blender",
+        "openssl"
+      ]
+    }
+  }
+}
